@@ -1,4 +1,4 @@
-volatile int state = LOW;
+//#include <ardumidi.h>
 
 int notes [24];
 int prevNote [24];
@@ -9,6 +9,7 @@ int COMAND_OFF = 0x80;
 unsigned long lastRead;
 int instrument;
 int analog11;
+int note_on = 0;
 
 void setup() {
   pinMode(46, OUTPUT);
@@ -19,17 +20,17 @@ void setup() {
     pinMode(notePins[i], INPUT);
   }
   for (int i = 0; i < 24; i++) {
-    prevNote[i] = 0;
+    prevNote[i] = 1;
   }
   
   analogWrite(46, 50);
   Serial.begin(38400);
+  readAllInputs();
 }
 
 void loop() {
   
   if ((millis() - lastRead) > 200)  {
-    Serial.println('-');
     analog11 = analogRead(A11);
     if (analog11 > 500) {
       instrument = instrument + 1;
@@ -41,41 +42,51 @@ void loop() {
     lastRead = millis();
     
   }
-      
-  //Serial.println("-----------------------------------");
-
-  for (int i = 0; i < 24; i++) {
-    notes[i] = 0;
-  }
-  
-  for (int i = 0; i < 100; i++) {
-    for (int j = 0; j < 24; j++) {
-      if (digitalRead(notePins[j])) {notes[j] = 1;}
-    }
-  }
+ 
+  readAllInputs();
   
   for (int i = 0; i < 24; i++) {
     if (prevNote[i] != notes[i]) {
-      playNote(i, 0, 60, notes[i]);
+      playNote(i, 0, 127, notes[i]);
       prevNote[i] = notes[i];
     }
-  }
+  
+  /*playNote(0, 0, 120, note_on);
+  if (note_on) {note_on = 0;}
+  else {note_on = 1;}
+  delay(1000);*/
+}
 }
 
-void playNote(int note, int chanel, int velocity, int noteOff) {
+void playNote(int note, int channel, int velocity, int noteOff) {
   int cmd;
-  if (noteOff) {cmd = COMAND_OFF + chanel;}
-  else {cmd = COMAND_ON + chanel;}
+  if (noteOff) {cmd = COMAND_OFF;}
+  else {cmd = COMAND_ON;}
+  cmd = cmd  | (channel & 0x0F);
   
+  //midi_note_on(chanel, 
   //Serial.write(0xA0+chanel);
   //Serial.write(60 + convertNote(note));
   //Serial.write(120);
   
   Serial.write(cmd);
   Serial.write(60 + convertNote(note));
-  if (noteOff) {Serial.write(velocity);}
-  else {Serial.write(0x00);}
+  Serial.write(velocity);
+  //if (noteOff) {Serial.write(velocity);}
+  //else {Serial.write(0x00);}
   //delay(500);
+}
+
+void readAllInputs() {
+  
+  for (int i = 0; i < 24; i++) {
+  notes[i] = 1;
+  }
+  for (int i = 0; i < 1000; i++) {
+    for (int j = 0; j < 24; j++) {
+      if (!digitalRead(notePins[j])) {notes[j] = 0;}
+    }
+  }
 }
 
 int convertNote(int note) {
